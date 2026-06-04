@@ -1,10 +1,38 @@
 from expense import Expense
+import json
+from pathlib import Path
+
 
 class ExpenseTracker:
+    
     def __init__(self):
         self.expenses = []
         self.next_id = 1
+        self.DATA_FILE = Path(__file__).parent.parent / "data" / "expenses.json"
 
+    # Save the Expenses in JSON format so that it can be used when the program closes still they're saved in .json file
+    def save_to_json(self):
+        json_expenses = []
+        for expense in self.expenses:
+            json_expenses.append(expense.to_dict())
+        with open(self.DATA_FILE, "w") as file:
+            json.dump(json_expenses, file, indent=4)    
+        print("File Created Succesfully!!")
+    def load_from_json(self):
+        
+        try:
+            with open(self.DATA_FILE, "r") as file:
+                data = json.load(file)
+
+                for expense_data in data:
+                    expense = Expense.from_dict(expense_data)
+                    self.expenses.append(expense)
+
+                if self.expenses:
+                    self.next_id = max(expense.id for expense in self.expenses) + 1
+            print("Succesfully! JSON File loaded")
+        except FileNotFoundError as _:
+            print("This is the first attemt and due to that the file is not available to load")
     def add_expense(self):
         try: 
             category = input("Category: ")
@@ -12,6 +40,7 @@ class ExpenseTracker:
             expense = Expense(self.next_id,category,amount)
             self.expenses.append(expense)
             self.next_id += 1
+            self.save_to_json()
         except ValueError as e:
             print(f"Please enter the amount in integer format")
         
@@ -20,6 +49,7 @@ class ExpenseTracker:
         for expense in self.expenses:
             if expense.id == expense_id:
                 expense.amount = amount
+                self.save_to_json()
                 return
         print("Incorrect Id")
 
@@ -27,6 +57,7 @@ class ExpenseTracker:
         for expense in self.expenses:
             if expense.id == expense_id:
                 self.expenses.remove(expense)
+                self.save_to_json()
                 return
         print("Incorrect Id")
     

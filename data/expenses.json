@@ -1,0 +1,22 @@
+[
+    {
+        "id": 1,
+        "category": "Food",
+        "amount": 400
+    },
+    {
+        "id": 2,
+        "category": "Mobile Recharge",
+        "amount": 800
+    },
+    {
+        "id": 3,
+        "category": "Travel",
+        "amount": 300
+    },
+    {
+        "id": 4,
+        "category": "Dish TV",
+        "amount": 1200
+    }
+]

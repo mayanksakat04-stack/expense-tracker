@@ -2,6 +2,7 @@ from expense_tracker import ExpenseTracker
 
 
 e_tracker = ExpenseTracker()
+e_tracker.load_from_json()
 while True:
     print("""
     1. Add Expense
@@ -45,7 +46,8 @@ while True:
         case 9:
             e_tracker.average_expense()
         case 10:
-            print("Exit.....")
+            e_tracker.save_to_json()
+            print("All Expenses are saved to JSON\nExit.....")
             break
 
 print("Expenses Tracker Window is closed now...")
