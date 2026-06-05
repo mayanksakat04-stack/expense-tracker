@@ -1,118 +1,251 @@
-from expense import Expense
+# from expense import Expense
 import json
 from pathlib import Path
-
-
+from database import get_connection
+import psycopg2
 class ExpenseTracker:
     
     def __init__(self):
-        self.expenses = []
-        self.next_id = 1
-        self.DATA_FILE = Path(__file__).parent.parent / "data" / "expenses.json"
-
-    # Save the Expenses in JSON format so that it can be used when the program closes still they're saved in .json file
-    def save_to_json(self):
-        json_expenses = []
-        for expense in self.expenses:
-            json_expenses.append(expense.to_dict())
-        with open(self.DATA_FILE, "w") as file:
-            json.dump(json_expenses, file, indent=4)    
-        print("File Created Succesfully!!")
-    def load_from_json(self):
-        
+        pass
+    
+    # POSTGRESQL CONNECTION
+    def connect_db(self):
         try:
-            with open(self.DATA_FILE, "r") as file:
-                data = json.load(file)
+            return get_connection()
+        except psycopg2.Error as e:
+            print("Error in Database Connection: \n",e)
+            return None
 
-                for expense_data in data:
-                    expense = Expense.from_dict(expense_data)
-                    self.expenses.append(expense)
-
-                if self.expenses:
-                    self.next_id = max(expense.id for expense in self.expenses) + 1
-            print("Succesfully! JSON File loaded")
-        except FileNotFoundError as _:
-            print("This is the first attemt and due to that the file is not available to load")
-    def add_expense(self):
+    def add_expense(self, category, amount):
+        conn = None
+        cursor = None
         try: 
-            category = input("Category: ")
-            amount = int(input("Amount: "))
-            expense = Expense(self.next_id,category,amount)
-            self.expenses.append(expense)
-            self.next_id += 1
-            self.save_to_json()
-        except ValueError as e:
-            print(f"Please enter the amount in integer format")
-        
+            conn = self.connect_db()
+            if conn is None:
+                return None
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO expenses (category, amount) VALUES (%s, %s)   
+                """, (category, amount))
+            conn.commit()
+            print("Expense added successfully!")
+        except ValueError:
+            print(f"Amount must be an integer.")
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
 
     def update_expense(self, expense_id, amount):
-        for expense in self.expenses:
-            if expense.id == expense_id:
-                expense.amount = amount
-                self.save_to_json()
-                return
-        print("Incorrect Id")
+        conn = None
+        cursor = None
+        try: 
+            conn = self.connect_db()
+            if conn is None:
+                return None
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE expenses SET amount = %s WHERE id = %s
+                """, (amount, expense_id))
+            conn.commit()
+            print("Expense updated successfully!")
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
 
     def del_expense(self, expense_id):
-        for expense in self.expenses:
-            if expense.id == expense_id:
-                self.expenses.remove(expense)
-                self.save_to_json()
-                return
-        print("Incorrect Id")
+        conn = None
+        cursor = None
+        try:
+            conn = self.connect_db()
+            if conn is None:
+                return None
+            cursor = conn.cursor()
+            cursor.execute("""
+                DELETE from expenses WHERE id = %s;
+                """, (expense_id,))
+            conn.commit()
+            print("Expense deleted successfully!")
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
     
     def print_expenses(self):
-        for expense in self.expenses:
-            print(expense)
+        conn = None
+        cursor = None
+        try:
+            conn = self.connect_db()
+            if conn is None:
+                return None
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * from expenses;
+                """)
+            print("EXPENSES: \n")
+            rows = cursor.fetchall()
+            if not rows:
+                print("No Expenses found")
+                return
+            for id, category, amount in rows:
+                print(f"{id}. {category} - ₹{amount}")
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+            
     
     def cal_total(self):
-        result = 0
-        for expense in self.expenses:
-            result += expense.amount
-        return result
-    
-    def get_unique_categories(self):
-        categories = set()
+        conn = None
+        cursor = None
 
-        for expense in self.expenses:
-            categories.add(expense.category)
-        return categories
+        try:
+            conn = self.connect_db()
+            if conn is None:
+                return None
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT SUM(amount) from expenses;
+                """)
+            print("Total: \n")
+            row = cursor.fetchone()
+            if row is not None:
+                total = row[0]
+                print("Total:", total)
+            else:
+                print("No expenses found.")
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
 
     def search_by_category(self, category):
-        found = False
-        for expense in self.expenses:
-            if expense.category == category:
-                print(expense)
-                found = True
-        if not found: print("Invalid Category")
+        conn = None
+        cursor = None
+        try: 
+            conn = self.connect_db()
+            if conn is None:
+                return None
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT category, amount FROM expenses WHERE category = %s;
+                """, (category,))
+            print(f"Searched data for Category: {category}\n")
+            rows = cursor.fetchall()
+            if not rows:
+                print("No Expenses found")
+                return
+            for row in rows:
+                print(row)
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
 
     def category_totals(self):
-        category_expenses = {}
-        for expense in self.expenses:
-            if expense.category not in category_expenses:
-                category_expenses[expense.category] = expense.amount
-            else:
-                category_expenses[expense.category] += expense.amount
-        
-        for category, amount in category_expenses.items():
-            print(f"{category} = {amount}")
+        conn = None
+        cursor = None
+        try:
+            conn = self.connect_db()
+            if conn is None:
+                return None
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT category, SUM(amount) from expenses GROUP BY category
+                """, )
+            print(f"Fetched all category total:\n")
+            rows = cursor.fetchall()
+
+            if not rows:
+                print("No Expenses found")
+                return
+            for row in rows:
+                print(row)
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
     def highest_expense(self):
-        if not self.expenses:
-            print("No expenses found")
-            return 
-        max_expense = self.expenses[0]
-        for expense in self.expenses:
-            if expense.amount > max_expense.amount:
-                max_expense = expense
-        
-        print("Highest Expense:")
-        print(max_expense)
+        conn = None
+        cursor = None
+
+        try:
+            conn = self.connect_db()
+            if conn is None:
+                return None
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT MAX(amount) from expenses;
+                """)
+
+            row = cursor.fetchone()
+            if row is not None:
+                highest = row[0]
+                print("Highest Expense:", highest)
+            else:
+                print("No expenses found.")
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
     
     def average_expense(self):
-        if len(self.expenses) == 0:
-            print("No expenses found")
-            return
-        avg_exp = self.cal_total() / len(self.expenses)
-        print("Average Expense = ",avg_exp)
+        conn = None
+        cursor = None
+
+        try:
+            conn = self.connect_db()
+            if conn is None:
+                return None
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT AVG(amount) from expenses;
+                """)
+            row = cursor.fetchone()
+            if row is not None:
+                average = row[0]
+                print("Average Expense:", average)
+            else:
+                print("No expenses found.")
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+    def get_expense_by_id(self, expense_id):
+        conn = None
+        cursor = None
+
+        try:
+            conn = self.connect_db()
+            if conn is None:
+                return None
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id, category, amount from expenses where id = %s;
+                """, (expense_id,))
+            row = cursor.fetchone()
+
+            if row is None:
+                print("No expense found")
+                return
+
+            id, category, amount = row
+            print(f"{id}. {category} - ₹{amount}")
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
 
              
